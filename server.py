@@ -9,6 +9,9 @@ ROOT=Path(__file__).resolve().parent
 DB=ROOT/'data'/'finance.sqlite3'
 LOCK=threading.RLock()
 MAX_BYTES=5_000_000
+# Deliberately fixed historical adjustment. It is appended on every read rather
+# than stored in SQLite, so imports, restores, and clear operations cannot alter it.
+WEBULL_ADJUSTMENT={'date':'2026-08-18','account':'w','action':'adjustment','kind':'BALANCE','symbol':'WEBULL','expiry':'','strike':'','amount':-1037.00}
 
 def now():return datetime.now(timezone.utc).isoformat()
 def connect():
@@ -30,6 +33,7 @@ def validate(rows):
 
 def read_state(c):
     entries=[dict(zip(('date','account','action','kind','symbol','expiry','strike','amount'),r)) for r in c.execute('SELECT date,account,action,kind,symbol,expiry,strike,amount FROM transactions ORDER BY position')]
+    entries.append(WEBULL_ADJUSTMENT.copy())
     meta=dict(c.execute('SELECT name,value FROM meta'))
     return {'entries':entries,'revision':int(meta.get('revision','0')),'updated_at':meta.get('updated_at')}
 

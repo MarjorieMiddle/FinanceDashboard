@@ -30,6 +30,8 @@ date,account,action,kind,symbol,expiry,strike,amount
 
 `account` accepts `brokerage`, `individual`, `i`, `roth`, `roth ira`, or `r`; `action` accepts buy/sell; and `kind` accepts call/put. Common aliases such as `ticker`, `side`, `type`, and `cash flow` are also accepted.
 
+The dashboard also includes a fixed Webull historical balance of **-$1,037.00** dated August 18, 2026. It is server-enforced, included in combined totals and exports, and cannot be changed by imports or by clearing local transaction data.
+
 ## 2. Access from iPhone
 
 The default server binds only to the Mac, not your network. For private access without opening your Mac to the public internet, use **Tailscale**:
@@ -66,7 +68,7 @@ Fidelity PDFs → Mac browser import → Mac HTTP API → Mac SQLite
 - Offline phone view shows **last synchronized data**, not Mac changes made after disconnect.
 - Primary data remains on Mac. A copy of transaction data is deliberately stored on your phone for offline viewing. Tailscale relays encrypted traffic when needed; it is not a finance cloud database.
 - The public dashboard contains no financial baseline or account identifiers. It calculates account and combined totals from data imported into the local database.
-- The PDF parser recognizes Brokerage and Roth IRA statements. Validate imported records against the source PDFs; the dashboard is not tax software.
+- The PDF parser recognizes Brokerage and Roth IRA statements. It imports filled option orders from both the `Pending` and `History` sections, deduplicating rows that appear in both. Validate imported records against the source PDFs; the dashboard is not tax software.
 
 ## Backup
 
