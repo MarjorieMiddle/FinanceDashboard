@@ -17,8 +17,11 @@ def now():return datetime.now(timezone.utc).isoformat()
 def connect():
     c=sqlite3.connect(DB,timeout=15)
     c.execute('PRAGMA journal_mode=WAL')
-    c.execute('CREATE TABLE IF NOT EXISTS transactions (position INTEGER PRIMARY KEY, date TEXT NOT NULL, account TEXT NOT NULL, action TEXT NOT NULL, kind TEXT NOT NULL, symbol TEXT NOT NULL, expiry TEXT NOT NULL, strike TEXT NOT NULL, amount REAL NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS transactions (position INTEGER PRIMARY KEY, date TEXT NOT NULL, account TEXT NOT NULL, action TEXT NOT NULL, kind TEXT NOT NULL, symbol TEXT NOT NULL, expiry TEXT NOT NULL, strike TEXT NOT NULL, quantity INTEGER NOT NULL DEFAULT 1, amount REAL NOT NULL)')
+    if 'quantity' not in {row[1] for row in c.execute('PRAGMA table_info(transactions)')}:
+        c.execute('ALTER TABLE transactions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
     c.execute('CREATE TABLE IF NOT EXISTS meta (name TEXT PRIMARY KEY,value TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS income_inputs (period TEXT NOT NULL, account TEXT NOT NULL, field TEXT NOT NULL, amount REAL NOT NULL, PRIMARY KEY (period,account,field))')
     return c
 
 def validate(rows):
@@ -27,21 +30,43 @@ def validate(rows):
         if not isinstance(x,dict) or not all(k in x for k in ('date','account','action','kind','symbol','expiry','strike','amount')):raise ValueError('Invalid transaction')
         if x['account'] not in ('i','r') or x['action'] not in ('buy','sell') or x['kind'] not in ('PUT','CALL'):raise ValueError('Invalid transaction attributes')
         if not isinstance(x['amount'],(int,float)) or not -1e9<float(x['amount'])<1e9:raise ValueError('Invalid amount')
+        if 'quantity' in x and (not isinstance(x['quantity'],int) or isinstance(x['quantity'],bool) or not 0<x['quantity']<=100000):raise ValueError('Invalid contract quantity')
         if not isinstance(x['date'],str) or len(x['date'])!=10:raise ValueError('Invalid date')
         datetime.strptime(x['date'],'%Y-%m-%d')
         if any(not isinstance(x[k],str) or len(x[k])>80 for k in ('symbol','expiry','strike')):raise ValueError('Invalid contract')
 
 def read_state(c):
-    entries=[dict(zip(('date','account','action','kind','symbol','expiry','strike','amount'),r)) for r in c.execute('SELECT date,account,action,kind,symbol,expiry,strike,amount FROM transactions ORDER BY position')]
+    entries=[dict(zip(('date','account','action','kind','symbol','expiry','strike','quantity','amount'),r)) for r in c.execute('SELECT date,account,action,kind,symbol,expiry,strike,quantity,amount FROM transactions ORDER BY position')]
     entries.append(WEBULL_ADJUSTMENT.copy())
     meta=dict(c.execute('SELECT name,value FROM meta'))
     return {'entries':entries,'revision':int(meta.get('revision','0')),'updated_at':meta.get('updated_at')}
 
 def write_state(c,entries,revision):
     c.execute('DELETE FROM transactions')
-    c.executemany('INSERT INTO transactions(position,date,account,action,kind,symbol,expiry,strike,amount) VALUES (?,?,?,?,?,?,?,?,?)',[(i,x['date'],x['account'],x['action'],x['kind'],x['symbol'],x['expiry'],x['strike'],x['amount']) for i,x in enumerate(entries)])
+    c.executemany('INSERT INTO transactions(position,date,account,action,kind,symbol,expiry,strike,quantity,amount) VALUES (?,?,?,?,?,?,?,?,?,?)',[(i,x['date'],x['account'],x['action'],x['kind'],x['symbol'],x['expiry'],x['strike'],x.get('quantity',1),x['amount']) for i,x in enumerate(entries)])
     c.execute("INSERT OR REPLACE INTO meta(name,value) VALUES ('revision',?)",(str(revision),))
     c.execute("INSERT OR REPLACE INTO meta(name,value) VALUES ('updated_at',?)",(now(),))
+
+def read_income_inputs(c):
+    values={}
+    for period,account,field,amount in c.execute('SELECT period,account,field,amount FROM income_inputs ORDER BY period,account,field'):
+        values.setdefault(period,{}).setdefault(account,{})[field]=amount
+    return {'values':values}
+
+def validate_income_inputs(data):
+    if not isinstance(data,dict) or not isinstance(data.get('period'),str) or not isinstance(data.get('rows'),dict):raise ValueError('Invalid income input data')
+    datetime.strptime(data['period'],'%Y-%m')
+    if len(data['rows'])>20:raise ValueError('Too many income rows')
+    accounts={'Net Income','GAS','Net checking','Subscription','NET HYSA','RothIRA','Mom','Holiday'}
+    fields={'planned_first','actual_first','planned_second','actual_second'}
+    for account,row in data['rows'].items():
+        if account not in accounts or not isinstance(row,dict) or len(row)>len(fields):raise ValueError('Invalid income row')
+        for field,amount in row.items():
+            if field not in fields or not isinstance(amount,(int,float)) or not -1e9<float(amount)<1e9:raise ValueError('Invalid income amount')
+
+def write_income_inputs(c,data):
+    c.execute('DELETE FROM income_inputs WHERE period=?',(data['period'],))
+    c.executemany('INSERT INTO income_inputs(period,account,field,amount) VALUES (?,?,?,?)',[(data['period'],account,field,amount) for account,row in data['rows'].items() for field,amount in row.items()])
 
 def initialize():
     DB.parent.mkdir(parents=True,exist_ok=True)
@@ -63,15 +88,24 @@ class Handler(SimpleHTTPRequestHandler):
         if urlsplit(self.path).path=='/api/state':
             with LOCK,connect() as c:s=read_state(c)
             s['can_edit']=self.loopback();return self.send_json(200,s)
+        if urlsplit(self.path).path=='/api/income-inputs':
+            with LOCK,connect() as c:return self.send_json(200,read_income_inputs(c))
         if urlsplit(self.path).path=='/api/health':return self.send_json(200,{'status':'ok'})
         return super().do_GET()
     def do_PUT(self):
-        if urlsplit(self.path).path!='/api/state':return self.send_json(404,{'error':'Not found'})
+        path=urlsplit(self.path).path
+        if path not in ('/api/state','/api/income-inputs'):return self.send_json(404,{'error':'Not found'})
         if not self.loopback():return self.send_json(403,{'error':'Remote access is read-only'})
         try:
             length=int(self.headers.get('Content-Length','0'))
             if length<1 or length>MAX_BYTES:return self.send_json(413,{'error':'Invalid payload size'})
-            data=json.loads(self.rfile.read(length));rows=data['entries'];validate(rows)
+            data=json.loads(self.rfile.read(length))
+            if path=='/api/income-inputs':
+                validate_income_inputs(data)
+                with LOCK,connect() as c:
+                    write_income_inputs(c,data)
+                    return self.send_json(200,{'updated_at':now()})
+            rows=data['entries'];validate(rows)
             with LOCK,connect() as c:
                 current=read_state(c)['revision']
                 if data.get('expected_revision')!=current:return self.send_json(409,{'error':'Revision conflict; refresh and retry','revision':current})

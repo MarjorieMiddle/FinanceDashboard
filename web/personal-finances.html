@@ -5,13 +5,224 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Personal Finances · Local Finance Dashboard</title>
   <style>
-    :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172b40;background:#f5f7fa}*{box-sizing:border-box}body{margin:0}.shell{max-width:1120px;margin:auto;padding:32px 20px 64px}.top,.toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}h1{margin:0;font-size:28px}h2{margin:0;font-size:18px}.sub,.muted{margin:7px 0 0;color:#64788d;font-size:13px}.pill{font-size:12px;background:#e9eef4;border:1px solid #d9e2eb;padding:8px 12px;border-radius:20px}.workspace-tabs{display:flex;gap:4px;margin-bottom:22px;padding:5px;background:#e8edf2;border-radius:11px;width:max-content;max-width:100%;overflow:auto}.workspace-tabs a{white-space:nowrap;text-decoration:none;color:#536e86;font-size:13px;font-weight:700;padding:9px 13px;border-radius:7px}.workspace-tabs a:hover,.workspace-tabs a:focus{color:#1e5a94;outline:none}.workspace-tabs a[aria-current=page]{background:#fff;color:#1e5a94;box-shadow:0 1px 3px rgba(23,43,64,.16)}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}.card,.panel{background:#fff;border:1px solid #e0e6ed;border-radius:12px;padding:20px}.label{color:#64788d;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}.metric{margin-top:8px;font-size:27px;font-weight:760;font-variant-numeric:tabular-nums}.positive{color:#15805b}.negative{color:#c34350}.panel{margin-top:16px}.two-col{display:grid;grid-template-columns:1.05fr .95fr;gap:16px}form{display:grid;grid-template-columns:1.2fr .75fr .9fr .8fr auto;gap:10px;margin-top:16px}input,select,button{font:inherit}input,select{width:100%;border:1px solid #cdd9e5;border-radius:8px;padding:10px;color:#172b40;background:#fff}button{cursor:pointer;border:1px solid #1e5a94;border-radius:8px;padding:10px 13px;background:#1e5a94;color:#fff;font-weight:700}button:hover{background:#174a7b}.secondary{background:#fff;color:#294761;border-color:#cdd9e5}.secondary:hover{background:#f2f7fb}.budget-list{display:grid;gap:14px;margin-top:18px}.budget-row{display:grid;grid-template-columns:135px 1fr 96px;align-items:center;gap:12px}.bar{height:10px;border-radius:99px;background:#e8edf2;overflow:hidden}.bar span{display:block;height:100%;border-radius:inherit;background:#3b82b6}.bar span.over{background:#c34350}.budget-amount{text-align:right;font-size:12px;font-variant-numeric:tabular-nums;color:#536e86}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #e9edf2}th{color:#64788d;font-size:12px}.right{text-align:right}.delete{padding:5px 8px;font-size:12px;background:#fff;color:#c34350;border-color:#efc5ca}.delete:hover{background:#fff1f2}.empty{color:#64788d;font-size:13px;padding:18px 0}.month{border:1px solid #cdd9e5;border-radius:8px;padding:9px 10px;color:#294761;background:#fff}@media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}form{grid-template-columns:1fr 1fr}form button{grid-column:1/-1}.budget-row{grid-template-columns:100px 1fr 82px}}@media(max-width:460px){.shell{padding:20px 12px}.cards{grid-template-columns:1fr}.budget-row{grid-template-columns:88px 1fr}.budget-amount{grid-column:2}.metric{font-size:25px}}
+    :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172b40;background:#f5f7fa}*{box-sizing:border-box}body{margin:0}.shell{max-width:1120px;margin:auto;padding:32px 20px 64px}.top,.toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}h1{margin:0;font-size:28px}h2{margin:0;font-size:18px}.sub,.muted{margin:7px 0 0;color:#64788d;font-size:13px}.pill{font-size:12px;background:#e9eef4;border:1px solid #d9e2eb;padding:8px 12px;border-radius:20px}.workspace-tabs{display:flex;gap:4px;margin-bottom:22px;padding:5px;background:#e8edf2;border-radius:11px;width:max-content;max-width:100%;overflow:auto}.workspace-tabs a{white-space:nowrap;text-decoration:none;color:#536e86;font-size:13px;font-weight:700;padding:9px 13px;border-radius:7px}.workspace-tabs a:hover,.workspace-tabs a:focus{color:#1e5a94;outline:none}.workspace-tabs a[aria-current=page]{background:#fff;color:#1e5a94;box-shadow:0 1px 3px rgba(23,43,64,.16)}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:24px 0}.card,.panel{background:#fff;border:1px solid #e0e6ed;border-radius:12px;padding:20px}.label{color:#64788d;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}.metric{margin-top:8px;font-size:27px;font-weight:760;font-variant-numeric:tabular-nums}.positive{color:#15805b}.negative{color:#c34350}.panel{margin-top:16px}.two-col{display:grid;grid-template-columns:1.05fr .95fr;gap:16px}form{display:grid;grid-template-columns:1.2fr .75fr .9fr .8fr auto;gap:10px;margin-top:16px}input,select,button{font:inherit}input,select{width:100%;border:1px solid #cdd9e5;border-radius:8px;padding:10px;color:#172b40;background:#fff}button{cursor:pointer;border:1px solid #1e5a94;border-radius:8px;padding:10px 13px;background:#1e5a94;color:#fff;font-weight:700}button:hover{background:#174a7b}.secondary{background:#fff;color:#294761;border-color:#cdd9e5}.secondary:hover{background:#f2f7fb}.budget-list{display:grid;gap:14px;margin-top:18px}.budget-row{display:grid;grid-template-columns:135px 1fr 96px;align-items:center;gap:12px}.bar{height:10px;border-radius:99px;background:#e8edf2;overflow:hidden}.bar span{display:block;height:100%;border-radius:inherit;background:#3b82b6}.bar span.over{background:#c34350}.budget-amount{text-align:right;font-size:12px;font-variant-numeric:tabular-nums;color:#536e86}table{width:100%;border-collapse:collapse;font-size:13px;margin-top:12px}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #e9edf2}th{color:#64788d;font-size:12px}.right{text-align:right}.delete{padding:5px 8px;font-size:12px;background:#fff;color:#c34350;border-color:#efc5ca}.delete:hover{background:#fff1f2}.empty{color:#64788d;font-size:13px;padding:18px 0}.month{border:1px solid #cdd9e5;border-radius:8px;padding:9px 10px;color:#294761;background:#fff}.month-control{display:flex;align-items:center;gap:8px;color:#536e86;font-size:13px;font-weight:700}.month-control select{width:auto;min-width:125px}.finance-table{max-width:680px}.finance-table th:last-child,.finance-table td:last-child{text-align:right;width:220px}.income-row th,.income-row td{padding-top:17px;font-weight:750;color:#1e5a94}.account-table-caption{margin:6px 0 0;color:#64788d;font-size:13px}.income-table-wrap{overflow-x:auto}.income-input-table{min-width:1040px}.income-input-table th{white-space:normal;vertical-align:bottom}.income-input-table input{width:128px;text-align:right;font-variant-numeric:tabular-nums}.income-input-table td:nth-child(n+3),.income-input-table th:nth-child(n+3){text-align:right}.total-row th,.total-row td{font-weight:800;background:#eef5fc;border-top:2px solid #b8cee2}@media(max-width:760px){.cards{grid-template-columns:repeat(2,1fr)}.two-col{grid-template-columns:1fr}form{grid-template-columns:1fr 1fr}form button{grid-column:1/-1}.budget-row{grid-template-columns:100px 1fr 82px}}@media(max-width:460px){.shell{padding:20px 12px}.cards{grid-template-columns:1fr}.budget-row{grid-template-columns:88px 1fr}.budget-amount{grid-column:2}.metric{font-size:25px}.month-control{width:100%;justify-content:space-between}.month-control select{min-width:170px}.finance-table th:last-child,.finance-table td:last-child{width:148px}}
   </style>
 </head>
 <body>
   <main class="shell">
     <nav class="workspace-tabs" aria-label="Dashboard"><a href="index.html">Trading dashboard</a><a href="personal-finances.html" aria-current="page">Personal finances</a></nav>
-    <header class="top"><h1>Personal finances</h1></header>
+    <header class="top">
+      <div>
+        <h1>Personal finances</h1>
+        <p id="monthDescription" class="sub" aria-live="polite"></p>
+      </div>
+      <label class="month-control" for="monthSelect">Month
+        <select id="monthSelect" class="month" aria-describedby="monthDescription">
+          <option value="0">January</option>
+          <option value="1">February</option>
+          <option value="2">March</option>
+          <option value="3">April</option>
+          <option value="4">May</option>
+          <option value="5">June</option>
+          <option value="6">July</option>
+          <option value="7">August</option>
+          <option value="8">September</option>
+          <option value="9">October</option>
+          <option value="10">November</option>
+          <option value="11">December</option>
+        </select>
+      </label>
+      <label class="month-control" for="yearSelect">Year
+        <select id="yearSelect" class="month" aria-describedby="monthDescription"></select>
+      </label>
+    </header>
+    <section class="panel" aria-labelledby="accountsTitle">
+      <h2 id="accountsTitle">Monthly accounts</h2>
+      <p id="accountTableCaption" class="account-table-caption"></p>
+      <table class="finance-table">
+        <thead><tr><th scope="col">Account</th><th id="amountHeading" scope="col">Actual amount</th></tr></thead>
+        <tbody id="accountRows"></tbody>
+      </table>
+    </section>
+    <section class="panel" aria-labelledby="incomeTitle">
+      <div class="toolbar"><div><h2 id="incomeTitle">Income input</h2><p id="incomeNote" class="account-table-caption"></p></div><button id="saveIncome" type="button">Save income input</button></div>
+      <div class="income-table-wrap"><table class="income-input-table">
+        <thead><tr><th scope="col">Account</th><th scope="col">Category</th><th scope="col">Bi-Weekly Amount<br>(1–15)</th><th scope="col">Actual Bi-Weekly Amount<br>(1–15)</th><th scope="col">Bi-Weekly Amount<br>(15–30)</th><th scope="col">Actual Bi-Weekly Amount<br>(15–30)</th><th id="incomeActualHeading" scope="col">Actual month amount<br>(1–30)</th></tr></thead>
+        <tbody id="incomeRows"></tbody>
+      </table></div>
+    </section>
   </main>
+  <script>
+    const monthSelect = document.getElementById('monthSelect');
+    const yearSelect = document.getElementById('yearSelect');
+    const monthDescription = document.getElementById('monthDescription');
+    const savedMonth = localStorage.getItem('personal-finance-month');
+    const savedYear = localStorage.getItem('personal-finance-year');
+    const accounts = ['GAS', 'Net checking', 'Subscription', 'NET HYSA', 'Gross HYSA', 'RothIRA', 'Mom'];
+    const grossHysaAccounts = ['GAS', 'Net checking', 'Subscription', 'NET HYSA'];
+    const incomeRows = [
+      ['Net Income', ''], ['GAS', 'spend'], ['Net checking', 'Spending budget'], ['Subscription', 'spend'],
+      ['NET HYSA', 'Savings'], ['Gross HYSA', 'checking + HYSA + gas + subscription'], ['RothIRA', 'save'], ['Mom', 'spend'], ['Holiday', 'spend']
+    ];
+    const incomeFields = ['planned_first', 'actual_first', 'planned_second', 'actual_second'];
+    let incomeData = {};
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: 7 }, (_, index) => currentYear + 2 - index);
+    yearSelect.innerHTML = years.map(year => `<option value="${year}">${year}</option>`).join('');
+    monthSelect.value = savedMonth && [...monthSelect.options].some(option => option.value === savedMonth) ? savedMonth : String(new Date().getMonth());
+    yearSelect.value = savedYear && years.includes(Number(savedYear)) ? savedYear : String(currentYear);
+
+    function priorPeriod() {
+      const date = new Date(Number(yearSelect.value), Number(monthSelect.value) - 1, 1);
+      return { month: date.getMonth(), year: date.getFullYear() };
+    }
+
+    function formatMonth(month, year) {
+      return new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    }
+
+    function storageKey() {
+      const { month, year } = priorPeriod();
+      return `${year}-${String(month + 1).padStart(2, '0')}`;
+    }
+
+    function readAccounts() {
+      const priorRows = incomeData[storageKey()] || {};
+      return Object.fromEntries([
+        ['income', actualMonthAmount(priorRows['Net Income'])],
+        ...accounts.map(account => [account, account === 'Gross HYSA' ? grossHysaActualMonth(priorRows) : actualMonthAmount(priorRows[account])])
+      ]);
+    }
+
+    function actualMonthAmount(row) {
+      const first = row?.actual_first;
+      const second = row?.actual_second;
+      const hasFirst = Number.isFinite(Number(first)) && first !== '';
+      const hasSecond = Number.isFinite(Number(second)) && second !== '';
+      return hasFirst || hasSecond ? (hasFirst ? Number(first) : 0) + (hasSecond ? Number(second) : 0) : undefined;
+    }
+
+    function grossHysaAmount(rows, field) {
+      const values = grossHysaAccounts.map(account => rows[account]?.[field]).filter(value => Number.isFinite(Number(value)) && value !== '');
+      return values.length ? values.reduce((sum, value) => sum + Number(value), 0) : undefined;
+    }
+
+    function grossHysaActualMonth(rows) {
+      return actualMonthAmount({
+        actual_first: grossHysaAmount(rows, 'actual_first'),
+        actual_second: grossHysaAmount(rows, 'actual_second')
+      });
+    }
+
+    function totalAmount(rows, field) {
+      const values = [
+        field === 'actual_month' ? grossHysaActualMonth(rows) : grossHysaAmount(rows, field),
+        ...(field === 'actual_month'
+          ? ['RothIRA', 'Mom', 'Holiday'].map(account => actualMonthAmount(rows[account]))
+          : ['RothIRA', 'Mom', 'Holiday'].map(account => rows[account]?.[field]))
+      ].filter(value => Number.isFinite(Number(value)) && value !== '');
+      return values.length ? values.reduce((sum, value) => sum + Number(value), 0) : undefined;
+    }
+
+    function inputPeriodKey() {
+      return `${yearSelect.value}-${String(Number(monthSelect.value) + 1).padStart(2, '0')}`;
+    }
+
+    function inputValue(value) {
+      return Number.isFinite(Number(value)) && value !== '' ? Number(value) : '';
+    }
+
+    function renderAccounts() {
+      const { month, year } = priorPeriod();
+      const name = formatMonth(month, year);
+      const monthName = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long' });
+      const values = readAccounts();
+      document.getElementById('accountTableCaption').textContent = `Values entered for ${name}.`;
+      document.getElementById('amountHeading').textContent = `Actual ${monthName} Amount (1–30)`;
+      document.getElementById('accountRows').innerHTML = [
+        `<tr class="income-row"><th scope="row">${monthName} Income</th><td>${formatAmount(values.income)}</td></tr>`,
+        ...accounts.map(account => `<tr><th scope="row">${account}</th><td>${formatAmount(values[account])}</td></tr>`)
+      ].join('');
+      renderIncomeInput();
+    }
+
+    function formatAmount(value) {
+      return Number.isFinite(Number(value)) && value !== '' ? Number(value).toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : '—';
+    }
+
+    function renderIncomeInput() {
+      const monthName = monthSelect.options[monthSelect.selectedIndex].text;
+      const values = incomeData[inputPeriodKey()] || {};
+      document.getElementById('incomeNote').textContent = `Enter planned and actual amounts for ${monthName} ${yearSelect.value}.`;
+      document.getElementById('incomeActualHeading').innerHTML = `Actual ${monthName} Amount<br>(1–30)`;
+      document.getElementById('incomeRows').innerHTML = incomeRows.map(([account, category]) => {
+        const row = values[account] || {};
+        if (account === 'Gross HYSA') return `<tr class="income-row" data-account="${account}"><th scope="row">${account}</th><td>${category}</td>${incomeFields.map(field => `<td data-field="${field}">${formatAmount(grossHysaAmount(values, field))}</td>`).join('')}<td data-field="actual_month">${formatAmount(grossHysaActualMonth(values))}</td></tr>`;
+        return `<tr data-account="${account}"><th scope="row">${account}</th><td>${category}</td>${incomeFields.map(field => `<td><input data-account="${account}" data-field="${field}" type="number" min="0" step="0.01" inputmode="decimal" aria-label="${account} ${field.replaceAll('_', ' ')}" value="${inputValue(row[field])}" placeholder="$0.00"></td>`).join('')}<td data-field="actual_month">${formatAmount(actualMonthAmount(row))}</td></tr>`;
+      }).join('') + `<tr class="total-row" data-account="Total"><th scope="row">Total</th><td>Gross HYSA + RothIRA + Mom + Holiday</td>${incomeFields.map(field => `<td data-field="${field}">${formatAmount(totalAmount(values, field))}</td>`).join('')}<td data-field="actual_month">${formatAmount(totalAmount(values, 'actual_month'))}</td></tr>`;
+      document.querySelectorAll('#incomeRows input').forEach(input => input.addEventListener('input', () => {
+        const row = input.closest('tr');
+        row.querySelector('[data-field="actual_month"]').textContent = formatAmount(actualMonthAmount({
+          actual_first: row.querySelector('[data-field="actual_first"]').value,
+          actual_second: row.querySelector('[data-field="actual_second"]').value
+        }));
+        const currentRows = inputRows();
+        const grossRow = document.querySelector('#incomeRows tr[data-account="Gross HYSA"]');
+        incomeFields.forEach(field => { grossRow.querySelector(`[data-field="${field}"]`).textContent = formatAmount(grossHysaAmount(currentRows, field)); });
+        grossRow.querySelector('[data-field="actual_month"]').textContent = formatAmount(grossHysaActualMonth(currentRows));
+        const totalRow = document.querySelector('#incomeRows tr[data-account="Total"]');
+        incomeFields.forEach(field => { totalRow.querySelector(`[data-field="${field}"]`).textContent = formatAmount(totalAmount(currentRows, field)); });
+        totalRow.querySelector('[data-field="actual_month"]').textContent = formatAmount(totalAmount(currentRows, 'actual_month'));
+      }));
+    }
+
+    function inputRows() {
+      const rows = {};
+      document.querySelectorAll('#incomeRows input').forEach(input => {
+        if (input.value !== '') (rows[input.dataset.account] ||= {})[input.dataset.field] = Number(input.value);
+      });
+      return rows;
+    }
+
+    function saveIncomeInput() {
+      const rows = inputRows();
+      const period = inputPeriodKey();
+      incomeData[period] = rows;
+      fetch('/api/income-inputs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ period, rows })
+      }).then(response => {
+        if (!response.ok) throw new Error('Unable to save');
+        document.getElementById('incomeNote').textContent = `Saved ${monthSelect.options[monthSelect.selectedIndex].text} ${yearSelect.value} income input.`;
+      }).catch(() => { document.getElementById('incomeNote').textContent = 'Unable to save. Check that the local dashboard server is running.'; });
+    }
+
+    async function loadIncomeInput() {
+      try {
+        const response = await fetch('/api/income-inputs');
+        if (!response.ok) throw new Error('Unable to load income input');
+        const { values } = await response.json();
+        incomeData = values;
+        renderAccounts();
+      } catch {
+        document.getElementById('incomeNote').textContent = 'Start the local dashboard server to save and load income input.';
+      }
+    }
+
+    function updateMonth() {
+      const name = monthSelect.options[monthSelect.selectedIndex].text;
+      monthDescription.textContent = `${name} ${yearSelect.value} overview`;
+      localStorage.setItem('personal-finance-month', monthSelect.value);
+      localStorage.setItem('personal-finance-year', yearSelect.value);
+      renderAccounts();
+    }
+
+    monthSelect.addEventListener('change', updateMonth);
+    yearSelect.addEventListener('change', updateMonth);
+    document.getElementById('saveIncome').addEventListener('click', saveIncomeInput);
+    updateMonth();
+    loadIncomeInput();
+  </script>
 </body>
 </html>
