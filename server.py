@@ -22,6 +22,8 @@ def connect():
         c.execute('ALTER TABLE transactions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
     c.execute('CREATE TABLE IF NOT EXISTS meta (name TEXT PRIMARY KEY,value TEXT NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS income_inputs (period TEXT NOT NULL, account TEXT NOT NULL, field TEXT NOT NULL, amount REAL NOT NULL, PRIMARY KEY (period,account,field))')
+    c.execute('CREATE TABLE IF NOT EXISTS income_tracker_entries (id TEXT PRIMARY KEY, category TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS income_tracker_subscriptions (id TEXT PRIMARY KEY, cadence TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, due_date TEXT NOT NULL)')
     return c
 
 def validate(rows):
@@ -68,6 +70,41 @@ def write_income_inputs(c,data):
     c.execute('DELETE FROM income_inputs WHERE period=?',(data['period'],))
     c.executemany('INSERT INTO income_inputs(period,account,field,amount) VALUES (?,?,?,?)',[(data['period'],account,field,amount) for account,row in data['rows'].items() for field,amount in row.items()])
 
+def read_income_tracker(c):
+    entries=[dict(zip(('id','category','description','amount','date'),row)) for row in c.execute('SELECT id,category,description,amount,date FROM income_tracker_entries ORDER BY date DESC,id DESC')]
+    subscriptions=[dict(zip(('id','cadence','description','amount','due_date'),row)) for row in c.execute('SELECT id,cadence,description,amount,due_date FROM income_tracker_subscriptions ORDER BY due_date,id')]
+    return {'entries':entries,'subscriptions':subscriptions}
+
+def validate_income_tracker(data):
+    if not isinstance(data,dict) or not isinstance(data.get('entries'),list) or not isinstance(data.get('subscriptions'),list):raise ValueError('Invalid income tracker data')
+    if len(data['entries'])>10000 or len(data['subscriptions'])>1000:raise ValueError('Too many income tracker records')
+    categories={'WTDC','Gift','Trading Payout','Other','Spent','GasBonus'}
+    ids=set()
+    for entry in data['entries']:
+        if not isinstance(entry,dict) or set(entry)!={'id','category','description','amount','date'}:raise ValueError('Invalid income entry')
+        if not isinstance(entry['id'],str) or not entry['id'] or len(entry['id'])>80 or entry['id'] in ids:raise ValueError('Invalid income entry ID')
+        ids.add(entry['id'])
+        if entry['category'] not in categories or not isinstance(entry['description'],str) or len(entry['description'])>200:raise ValueError('Invalid income entry details')
+        if entry['category']=='Spent' and not entry['description'].strip():raise ValueError('A spending description is required')
+        if not isinstance(entry['amount'],(int,float)) or not 0<=float(entry['amount'])<1e9:raise ValueError('Invalid income entry amount')
+        if not isinstance(entry['date'],str) or len(entry['date'])!=10:raise ValueError('Invalid income entry date')
+        datetime.strptime(entry['date'],'%Y-%m-%d')
+    ids=set()
+    for subscription in data['subscriptions']:
+        if not isinstance(subscription,dict) or set(subscription)!={'id','cadence','description','amount','due_date'}:raise ValueError('Invalid subscription')
+        if not isinstance(subscription['id'],str) or not subscription['id'] or len(subscription['id'])>80 or subscription['id'] in ids:raise ValueError('Invalid subscription ID')
+        ids.add(subscription['id'])
+        if subscription['cadence'] not in {'Monthly','Yearly'} or not isinstance(subscription['description'],str) or not subscription['description'].strip() or len(subscription['description'])>200:raise ValueError('Invalid subscription details')
+        if not isinstance(subscription['amount'],(int,float)) or not 0<=float(subscription['amount'])<1e9:raise ValueError('Invalid subscription amount')
+        if not isinstance(subscription['due_date'],str) or len(subscription['due_date'])!=10:raise ValueError('Invalid subscription due date')
+        datetime.strptime(subscription['due_date'],'%Y-%m-%d')
+
+def write_income_tracker(c,data):
+    c.execute('DELETE FROM income_tracker_entries')
+    c.execute('DELETE FROM income_tracker_subscriptions')
+    c.executemany('INSERT INTO income_tracker_entries(id,category,description,amount,date) VALUES (?,?,?,?,?)',[(x['id'],x['category'],x['description'],x['amount'],x['date']) for x in data['entries']])
+    c.executemany('INSERT INTO income_tracker_subscriptions(id,cadence,description,amount,due_date) VALUES (?,?,?,?,?)',[(x['id'],x['cadence'],x['description'],x['amount'],x['due_date']) for x in data['subscriptions']])
+
 def initialize():
     DB.parent.mkdir(parents=True,exist_ok=True)
     with LOCK,connect() as c:
@@ -90,11 +127,13 @@ class Handler(SimpleHTTPRequestHandler):
             s['can_edit']=self.loopback();return self.send_json(200,s)
         if urlsplit(self.path).path=='/api/income-inputs':
             with LOCK,connect() as c:return self.send_json(200,read_income_inputs(c))
+        if urlsplit(self.path).path=='/api/income-tracker':
+            with LOCK,connect() as c:return self.send_json(200,read_income_tracker(c))
         if urlsplit(self.path).path=='/api/health':return self.send_json(200,{'status':'ok'})
         return super().do_GET()
     def do_PUT(self):
         path=urlsplit(self.path).path
-        if path not in ('/api/state','/api/income-inputs'):return self.send_json(404,{'error':'Not found'})
+        if path not in ('/api/state','/api/income-inputs','/api/income-tracker'):return self.send_json(404,{'error':'Not found'})
         if not self.loopback():return self.send_json(403,{'error':'Remote access is read-only'})
         try:
             length=int(self.headers.get('Content-Length','0'))
@@ -104,6 +143,11 @@ class Handler(SimpleHTTPRequestHandler):
                 validate_income_inputs(data)
                 with LOCK,connect() as c:
                     write_income_inputs(c,data)
+                    return self.send_json(200,{'updated_at':now()})
+            if path=='/api/income-tracker':
+                validate_income_tracker(data)
+                with LOCK,connect() as c:
+                    write_income_tracker(c,data)
                     return self.send_json(200,{'updated_at':now()})
             rows=data['entries'];validate(rows)
             with LOCK,connect() as c:
