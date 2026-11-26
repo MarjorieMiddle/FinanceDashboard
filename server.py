@@ -79,7 +79,7 @@ def validate_income_tracker(data):
     if not isinstance(data,dict) or not isinstance(data.get('entries'),list) or not isinstance(data.get('subscriptions'),list):raise ValueError('Invalid income tracker data')
     if len(data['entries'])>10000 or len(data['subscriptions'])>1000:raise ValueError('Too many income tracker records')
     categories={'WTDC','Gift','Trading Payout','Other','Spent','GasBonus'}
-    ids=set()
+    ids=set(); gas_bonus_months=set()
     for entry in data['entries']:
         if not isinstance(entry,dict) or set(entry)!={'id','category','description','amount','date'}:raise ValueError('Invalid income entry')
         if not isinstance(entry['id'],str) or not entry['id'] or len(entry['id'])>80 or entry['id'] in ids:raise ValueError('Invalid income entry ID')
@@ -89,6 +89,10 @@ def validate_income_tracker(data):
         if not isinstance(entry['amount'],(int,float)) or not 0<=float(entry['amount'])<1e9:raise ValueError('Invalid income entry amount')
         if not isinstance(entry['date'],str) or len(entry['date'])!=10:raise ValueError('Invalid income entry date')
         datetime.strptime(entry['date'],'%Y-%m-%d')
+        if entry['category']=='GasBonus':
+            month=entry['date'][:7]
+            if month in gas_bonus_months:raise ValueError('Only one GasBonus entry is allowed per month')
+            gas_bonus_months.add(month)
     ids=set()
     for subscription in data['subscriptions']:
         if not isinstance(subscription,dict) or set(subscription)!={'id','cadence','description','amount','due_date'}:raise ValueError('Invalid subscription')
@@ -128,7 +132,8 @@ class Handler(SimpleHTTPRequestHandler):
         if urlsplit(self.path).path=='/api/income-inputs':
             with LOCK,connect() as c:return self.send_json(200,read_income_inputs(c))
         if urlsplit(self.path).path=='/api/income-tracker':
-            with LOCK,connect() as c:return self.send_json(200,read_income_tracker(c))
+            with LOCK,connect() as c:data=read_income_tracker(c)
+            data['can_edit']=self.loopback();return self.send_json(200,data)
         if urlsplit(self.path).path=='/api/health':return self.send_json(200,{'status':'ok'})
         return super().do_GET()
     def do_PUT(self):

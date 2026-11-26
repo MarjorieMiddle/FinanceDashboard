@@ -1,4 +1,5 @@
 <!doctype html>
+<link rel="stylesheet" href="theme.css">
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -52,7 +53,9 @@
       </table></div>
     </section>
   </main>
-  <script>
+  <script type="module">
+    import { getVault } from './offline-vault.js';
+    const vault = await getVault();
     const monthSelect = document.getElementById('monthSelect');
     const yearSelect = document.getElementById('yearSelect');
     const monthDescription = document.getElementById('monthDescription');
@@ -192,19 +195,20 @@
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period, rows })
-      }).then(response => {
+      }).then(async response => {
         if (!response.ok) throw new Error('Unable to save');
+        await vault.storeJSON('/api/income-inputs', { values: incomeData });
         document.getElementById('incomeNote').textContent = `Saved ${monthSelect.options[monthSelect.selectedIndex].text} ${yearSelect.value} income input.`;
       }).catch(() => { document.getElementById('incomeNote').textContent = 'Unable to save. Check that the local dashboard server is running.'; });
     }
 
     async function loadIncomeInput() {
       try {
-        const response = await fetch('/api/income-inputs');
-        if (!response.ok) throw new Error('Unable to load income input');
-        const { values } = await response.json();
+        const { value, offline } = await vault.getJSON('/api/income-inputs');
+        const { values } = value;
         incomeData = values;
         renderAccounts();
+        if (offline) document.getElementById('incomeNote').textContent = 'Showing encrypted offline snapshot.';
       } catch {
         document.getElementById('incomeNote').textContent = 'Start the local dashboard server to save and load income input.';
       }

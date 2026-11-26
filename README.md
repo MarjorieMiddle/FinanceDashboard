@@ -80,6 +80,37 @@ python3 -c "import sqlite3; s=sqlite3.connect('data/finance.sqlite3'); d=sqlite3
 
 Keep backups outside the project folder. Do not delete `data/finance.sqlite3` unless you intend to reset the database.
 
+## Export Firebase Firestore data for migration
+
+The `scripts/export-firestore.mjs` utility makes a **read-only** JSON copy of every document and subcollection in a Firestore database. It uses only Node.js built-ins; no Firebase package is installed and it does not write to Firestore.
+
+1. In Firebase Project settings → **Service accounts**, create a private service-account key. Store it outside this repository (for example, in your Downloads folder). Never commit or share it.
+2. From this project folder, run:
+
+   ```bash
+   node scripts/export-firestore.mjs --credentials /absolute/path/to/service-account.json
+   ```
+
+3. The result is saved at `data/firestore-export.json`, which is ignored by Git. Its final line reports the exported document count.
+
+The exporter preserves collection names, document IDs, nested subcollections, and Firestore values. It does not yet import into SQLite: inspect the exported collection names and record fields first so the migration can map them safely to the dashboard's trading, income, spending, and subscription tables.
+
+### Import the reviewed export
+
+`scripts/import_firestore.py` merges the legacy `incomeData`, `spentHistory`, and `Subscriptions` collections into the income tracker. It first previews what it will add:
+
+```bash
+python3 scripts/import_firestore.py
+```
+
+To write the import, run:
+
+```bash
+python3 scripts/import_firestore.py --apply
+```
+
+The import preserves existing dashboard records, skips records it previously imported, converts legacy dates to `YYYY-MM-DD`, and creates a timestamped SQLite backup before writing. Legacy income labels not supported by the current UI (such as `Tutoring` and `CodeNinjas`) are saved as `Other` with their original label retained in the description.
+
 ## Limitations
 
 - The Mac must be powered on and connected for the phone to receive **new** updates; offline phone viewing works from the most recent successful synchronization.
