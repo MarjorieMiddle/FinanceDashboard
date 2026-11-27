@@ -22,7 +22,9 @@ def connect():
         c.execute('ALTER TABLE transactions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1')
     c.execute('CREATE TABLE IF NOT EXISTS meta (name TEXT PRIMARY KEY,value TEXT NOT NULL)')
     c.execute('CREATE TABLE IF NOT EXISTS income_inputs (period TEXT NOT NULL, account TEXT NOT NULL, field TEXT NOT NULL, amount REAL NOT NULL, PRIMARY KEY (period,account,field))')
-    c.execute('CREATE TABLE IF NOT EXISTS income_tracker_entries (id TEXT PRIMARY KEY, category TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS income_tracker_entries (id TEXT PRIMARY KEY, category TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, date TEXT NOT NULL, tag TEXT NOT NULL DEFAULT \'\')')
+    if 'tag' not in {row[1] for row in c.execute('PRAGMA table_info(income_tracker_entries)')}:
+        c.execute("ALTER TABLE income_tracker_entries ADD COLUMN tag TEXT NOT NULL DEFAULT ''")
     c.execute('CREATE TABLE IF NOT EXISTS income_tracker_subscriptions (id TEXT PRIMARY KEY, cadence TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, due_date TEXT NOT NULL)')
     return c
 
@@ -71,7 +73,10 @@ def write_income_inputs(c,data):
     c.executemany('INSERT INTO income_inputs(period,account,field,amount) VALUES (?,?,?,?)',[(data['period'],account,field,amount) for account,row in data['rows'].items() for field,amount in row.items()])
 
 def read_income_tracker(c):
-    entries=[dict(zip(('id','category','description','amount','date'),row)) for row in c.execute('SELECT id,category,description,amount,date FROM income_tracker_entries ORDER BY date DESC,id DESC')]
+    entries=[dict(zip(('id','category','description','amount','date','tag'),row)) for row in c.execute('SELECT id,category,description,amount,date,tag FROM income_tracker_entries ORDER BY date DESC,id DESC')]
+    for entry in entries:
+        if entry['category']=='Spent' and not entry['tag'] and ('gas' in entry['description'].lower() or 'fuel' in entry['description'].lower()):
+            entry['tag']='Gas'
     subscriptions=[dict(zip(('id','cadence','description','amount','due_date'),row)) for row in c.execute('SELECT id,cadence,description,amount,due_date FROM income_tracker_subscriptions ORDER BY due_date,id')]
     return {'entries':entries,'subscriptions':subscriptions}
 
@@ -81,10 +86,12 @@ def validate_income_tracker(data):
     categories={'WTDC','Gift','Trading Payout','Other','Spent','GasBonus'}
     ids=set(); gas_bonus_months=set()
     for entry in data['entries']:
-        if not isinstance(entry,dict) or set(entry)!={'id','category','description','amount','date'}:raise ValueError('Invalid income entry')
+        if not isinstance(entry,dict) or not {'id','category','description','amount','date'}<=set(entry)<= {'id','category','description','amount','date','tag'}:raise ValueError('Invalid income entry')
         if not isinstance(entry['id'],str) or not entry['id'] or len(entry['id'])>80 or entry['id'] in ids:raise ValueError('Invalid income entry ID')
         ids.add(entry['id'])
         if entry['category'] not in categories or not isinstance(entry['description'],str) or len(entry['description'])>200:raise ValueError('Invalid income entry details')
+        if entry['category']=='Spent' and not entry.get('tag','') and ('gas' in entry['description'].lower() or 'fuel' in entry['description'].lower()):entry['tag']='Gas'
+        if entry.get('tag','') not in {'','Mom','Day Trading','Gas'}:raise ValueError('Invalid income entry tag')
         if entry['category']=='Spent' and not entry['description'].strip():raise ValueError('A spending description is required')
         if not isinstance(entry['amount'],(int,float)) or not 0<=float(entry['amount'])<1e9:raise ValueError('Invalid income entry amount')
         if not isinstance(entry['date'],str) or len(entry['date'])!=10:raise ValueError('Invalid income entry date')
@@ -106,7 +113,7 @@ def validate_income_tracker(data):
 def write_income_tracker(c,data):
     c.execute('DELETE FROM income_tracker_entries')
     c.execute('DELETE FROM income_tracker_subscriptions')
-    c.executemany('INSERT INTO income_tracker_entries(id,category,description,amount,date) VALUES (?,?,?,?,?)',[(x['id'],x['category'],x['description'],x['amount'],x['date']) for x in data['entries']])
+    c.executemany('INSERT INTO income_tracker_entries(id,category,description,amount,date,tag) VALUES (?,?,?,?,?,?)',[(x['id'],x['category'],x['description'],x['amount'],x['date'],x.get('tag','')) for x in data['entries']])
     c.executemany('INSERT INTO income_tracker_subscriptions(id,cadence,description,amount,due_date) VALUES (?,?,?,?,?)',[(x['id'],x['cadence'],x['description'],x['amount'],x['due_date']) for x in data['subscriptions']])
 
 def initialize():

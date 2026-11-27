@@ -80,11 +80,14 @@ function addLockControl(){
   if(document.getElementById('offlineVaultLock'))return;
   const button=document.createElement('button');
   button.id='offlineVaultLock';
+  button.className='offline-vault-lock';
   button.type='button';
   button.textContent='Lock offline data';
-  button.style.cssText='position:fixed;right:16px;bottom:16px;z-index:9998;padding:9px 12px;border:1px solid #cdd9e5;border-radius:999px;background:#fff;color:#294761;font:600 12px Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 4px 16px rgba(23,43,64,.16)';
+  button.style.cssText='position:static;z-index:auto;flex:none';
   button.onclick=()=>{sessionStorage.removeItem(SESSION_KEY);location.reload();};
-  document.body.append(button);
+  const personalFinances=document.querySelector('.workspace-tabs a[href="personal-finances.html"]');
+  if(personalFinances)personalFinances.insertAdjacentElement('afterend',button);
+  else document.body.append(button);
 }
 async function seal(key,value){
   const iv=crypto.getRandomValues(new Uint8Array(12));
