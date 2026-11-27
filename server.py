@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Local-first SQLite dashboard; writes allowed only from loopback."""
-import argparse, json, os, sqlite3, threading, ipaddress
+import argparse, json, os, sqlite3, threading, ipaddress, math
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -26,6 +26,8 @@ def connect():
     if 'tag' not in {row[1] for row in c.execute('PRAGMA table_info(income_tracker_entries)')}:
         c.execute("ALTER TABLE income_tracker_entries ADD COLUMN tag TEXT NOT NULL DEFAULT ''")
     c.execute('CREATE TABLE IF NOT EXISTS income_tracker_subscriptions (id TEXT PRIMARY KEY, cadence TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, due_date TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS trading_workspace_settings (name TEXT PRIMARY KEY, amount REAL NOT NULL, updated_at TEXT NOT NULL)')
+    c.execute('CREATE TABLE IF NOT EXISTS trading_workspace_adjustments (id INTEGER PRIMARY KEY AUTOINCREMENT, previous_amount REAL NOT NULL, updated_amount REAL NOT NULL, difference REAL NOT NULL, modified_at TEXT NOT NULL)')
     return c
 
 def validate(rows):
@@ -116,6 +118,51 @@ def write_income_tracker(c,data):
     c.executemany('INSERT INTO income_tracker_entries(id,category,description,amount,date,tag) VALUES (?,?,?,?,?,?)',[(x['id'],x['category'],x['description'],x['amount'],x['date'],x.get('tag','')) for x in data['entries']])
     c.executemany('INSERT INTO income_tracker_subscriptions(id,cadence,description,amount,due_date) VALUES (?,?,?,?,?)',[(x['id'],x['cadence'],x['description'],x['amount'],x['due_date']) for x in data['subscriptions']])
 
+def workspace_state(c):
+    row=c.execute("SELECT amount,updated_at FROM trading_workspace_settings WHERE name='hysa_deposit'").fetchone()
+    history=[dict(zip(('previous_amount','updated_amount','difference','modified_at'),record)) for record in c.execute('SELECT previous_amount,updated_amount,difference,modified_at FROM trading_workspace_adjustments ORDER BY id DESC')]
+    day_trading_expenses=c.execute("SELECT COALESCE(SUM(amount),0) FROM income_tracker_entries WHERE category='Spent' AND tag='Day Trading'").fetchone()[0]
+    return {'hysa_deposit_amount':row[0] if row else 0,'updated_at':row[1] if row else None,'adjustment_history':history,'day_trading_expenses':day_trading_expenses}
+
+def validate_workspace_amount(amount):
+    if not isinstance(amount,(int,float)) or isinstance(amount,bool) or not math.isfinite(amount) or not 0<=float(amount)<1e9:raise ValueError('HYSA deposit must be a valid non-negative amount')
+
+def update_workspace_deposit(c,amount,action):
+    validate_workspace_amount(amount)
+    if action not in ('deposit','withdraw'):raise ValueError('Invalid HYSA adjustment type')
+    current=workspace_state(c)['hysa_deposit_amount']
+    amount=round(float(amount),2)
+    if amount<=0:raise ValueError('Enter an amount greater than zero')
+    updated=round(current+amount if action=='deposit' else current-amount,2)
+    if updated<0:raise ValueError('Withdrawal cannot exceed the saved HYSA balance')
+    if updated!=current:
+        timestamp=now()
+        c.execute("INSERT OR REPLACE INTO trading_workspace_settings(name,amount,updated_at) VALUES ('hysa_deposit',?,?)",(updated,timestamp))
+        c.execute('INSERT INTO trading_workspace_adjustments(previous_amount,updated_amount,difference,modified_at) VALUES (?,?,?,?)',(current,updated,round(updated-current,2),timestamp))
+    return workspace_state(c)
+
+def restore_workspace(c,data):
+    if not isinstance(data,dict) or set(data)!={'hysa_deposit_amount','adjustment_history'}:raise ValueError('Invalid trading workspace backup')
+    validate_workspace_amount(data['hysa_deposit_amount'])
+    history=data['adjustment_history']
+    if not isinstance(history,list) or len(history)>10000:raise ValueError('Invalid adjustment history')
+    parsed=[]
+    for item in history:
+        if not isinstance(item,dict) or set(item)!={'previous_amount','updated_amount','difference','modified_at'}:raise ValueError('Invalid adjustment record')
+        for field in ('previous_amount','updated_amount','difference'):validate_workspace_amount(abs(item[field]))
+        if not isinstance(item['modified_at'],str) or len(item['modified_at'])>64:raise ValueError('Invalid adjustment timestamp')
+        parsed.append((item['previous_amount'],item['updated_amount'],item['difference'],item['modified_at']))
+    timestamp=now()
+    c.execute("INSERT OR REPLACE INTO trading_workspace_settings(name,amount,updated_at) VALUES ('hysa_deposit',?,?)",(round(float(data['hysa_deposit_amount']),2),timestamp))
+    c.execute('DELETE FROM trading_workspace_adjustments')
+    c.executemany('INSERT INTO trading_workspace_adjustments(previous_amount,updated_amount,difference,modified_at) VALUES (?,?,?,?)',parsed[::-1])
+    return workspace_state(c)
+
+def clear_workspace_history(c):
+    c.execute('DELETE FROM trading_workspace_adjustments')
+    c.execute("DELETE FROM trading_workspace_settings WHERE name='hysa_deposit'")
+    return workspace_state(c)
+
 def initialize():
     DB.parent.mkdir(parents=True,exist_ok=True)
     with LOCK,connect() as c:
@@ -141,11 +188,14 @@ class Handler(SimpleHTTPRequestHandler):
         if urlsplit(self.path).path=='/api/income-tracker':
             with LOCK,connect() as c:data=read_income_tracker(c)
             data['can_edit']=self.loopback();return self.send_json(200,data)
+        if urlsplit(self.path).path=='/api/trading-workspace':
+            with LOCK,connect() as c:data=workspace_state(c)
+            data['can_edit']=self.loopback();return self.send_json(200,data)
         if urlsplit(self.path).path=='/api/health':return self.send_json(200,{'status':'ok'})
         return super().do_GET()
     def do_PUT(self):
         path=urlsplit(self.path).path
-        if path not in ('/api/state','/api/income-inputs','/api/income-tracker'):return self.send_json(404,{'error':'Not found'})
+        if path not in ('/api/state','/api/income-inputs','/api/income-tracker','/api/trading-workspace','/api/trading-workspace/restore','/api/trading-workspace/history/clear'):return self.send_json(404,{'error':'Not found'})
         if not self.loopback():return self.send_json(403,{'error':'Remote access is read-only'})
         try:
             length=int(self.headers.get('Content-Length','0'))
@@ -161,6 +211,12 @@ class Handler(SimpleHTTPRequestHandler):
                 with LOCK,connect() as c:
                     write_income_tracker(c,data)
                     return self.send_json(200,{'updated_at':now()})
+            if path=='/api/trading-workspace':
+                with LOCK,connect() as c:return self.send_json(200,update_workspace_deposit(c,data.get('amount'),data.get('action')))
+            if path=='/api/trading-workspace/restore':
+                with LOCK,connect() as c:return self.send_json(200,restore_workspace(c,data))
+            if path=='/api/trading-workspace/history/clear':
+                with LOCK,connect() as c:return self.send_json(200,clear_workspace_history(c))
             rows=data['entries'];validate(rows)
             with LOCK,connect() as c:
                 current=read_state(c)['revision']
